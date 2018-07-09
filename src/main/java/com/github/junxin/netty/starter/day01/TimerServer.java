@@ -1,4 +1,4 @@
-package com.github.junxin.netty.starter;
+package com.github.junxin.netty.starter.day01;
 
 import java.io.IOException;
 import java.net.ServerSocket;
