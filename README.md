@@ -80,3 +80,38 @@ Channel可以分为两大类：用于网络读写的SelectableChannel和用于�
 三次握手，TCP物理链路正式建立。注意：我们需要将新创建的SocketChannel设置为异步非阻塞，同时也可以对其TCP参数进行设置。例如，TCP接收和
 发送缓冲区的大小等。
 
+# Netty学习day04：AIO编程
+## AIO简介
+`NIO 2.0`引入了新的异步通道的概念，并提供了异步文件通道和异步套接字通道的实现。异步通道通过以下两种方式来获取操作结果。  
+1、通过java.util.concurrent.Future类来标识异步操作的结果；  
+2、在执行异步操作的时候传入一个java.nio.channels。  
+ComletionHandler接口的实现类为操作完成的回调。  
+`NIO 2.0`的异步套接字通道是真正的异步非阻塞I/O，对应于UNIX网络编程中的事件驱动I/O（AIO）。它不需要通过多路复用器（Selector）对注册
+的通道进行轮询操作即可实现异步读写，从而简化了NIO的编程模型。
+## AIO创建的TimerServer源码分析
+- 在`AsyncTimerServerHandler`的 *run()* 方法中，初始化CountDownLatch对象，它的作用是在完成一组正在执行的操作之前，允许当前的线
+程一直阻塞。在代码中，我们让线程在此阻塞，防止服务端执行完成退出。
+- 在`AsyncTimerServerHandler`的 *doAccept()* 方法中，我们用于接收客户端的连接，由于是异步操作，我们可以传递一个CompletionHandler
+<AsynchronousSocketChannel, ? super A>类型的handler实例接收accept操作成功的通知消息。
+- 在`AcceptCompletionHandler`中有两个方法*completed()*，_failed()_  
+-- completed接口的实现，我们从attachment获取成员变量AsynchronousServerSocketChannel，然后继续调用它的accept方法。这里有个疑问：
+既然已经接收客户端成功了，为什么还要再次调用accept方法呢？原因是：调用AsynchronusServerSocketChannel的accept方法后，如果有新的
+客户端连接接入，系统将回调我们传入的CompletionHandler实例的completed方法，表示新的客户端已经接入成功。因为一个AsynchronousServerSocketChannel
+可以接收成千上万个客户端，所以需要继续调用它的accept方法，接收其他的客户端连接，最终形成一个循环。每当接收一个客户端的连接成功后，再异步
+接收新的客户端连接。
+- 链路建立成功之后，服务端需要接收客户端的请求消息，在代码中，我们创建新的ByteBuffer，与分配1MB的缓冲区。通过调用AsynchronousSocketChannel
+的read方法进行异步读操作。read方法的参数有三个，**_ByteBuffer dst_**:接收缓冲区，用于从异步Channel中读取数据包；**_A attachment_**:
+异步Channel携带的附件，通知回调的时候作为入参使用；**_CompletionHandler<Integer, ? super A>_**：接收通知回调的业务Handler，
+在这里为`ReadCompletionHander`
+- `ReadCompletionHander`的构造方法将AsynchronousSocketChannel通过参数传递到ReadCompletionHandler中，当作成员变量来使用，
+主要用户读取半包消息和发送应答。这里不对半包读写进行具体说明。
+- `ReadCompletionHander`的 *completed()* 方法，首先对attachment进行flip操作，为后续从缓冲区读取数据做准备。根据缓冲区的可读
+字节数创建byte数组，然后通过new String方法创建请求消息，对请求消息进行判断。然后调用doWrite方法发送给客户端。
+## AIO创建的TimerClient源码分析
+由于在AsyncTimerClientHandler中大量使用了匿名内部类，所以代码看起来有点复杂。
+- 首先在构造方法中通过AsynchronousSocketChannel的open方法创建一个新的AsynchronousSocketChannel对象。
+- 然后在*run()* 方法中创建CountDownLatch进行等待，防止异步操作没有执行完成线程就退出。通过connect方法发起异步操作，它有两个参数：
+**_A attachment_**：AsynchronousSocketChannel的附件，用于回调通知时作为入参被传递，调用这可以自定义；**_CompletionHandler
+<Void, ? suuper A> handler_**：异步操作回调通知接口，由调用者实现。在例子中，这两个参数都使用 AsyncTimerClientHandler 类本身
+因为它实现了CompletionHandler接口。
+
