@@ -47,5 +47,36 @@ windows size`大于0或者发生异常。
 - 由于前端只有一个Accptor线程接收客户端接入，他被阻塞在线程池的同步阻塞队列之后，新的客户端请求消息将被拒绝，客户端将会产生大量的连接超时。
 - 由于几乎所有的连接都超时，调用者会认为系统已经崩溃，无法接收新的请求消息。
 
+# Netty学习day03：NIO编程
 
+## NIO简介
+- 官方：NIO有人称之为New I/O，原因在于它相对于之前的I/O类库是新增的
+- 民间：由于之前老的I/O类库是阻塞式I/O，New I/O类库的目标就是要让Java支持非阻塞I/O，所以，更多人喜欢称之为非阻塞I/O（Non-block I/O）
+
+## NIO类库简介
+### 缓冲区Buffer
+- ByteBuffer：字节缓冲区
+- CharBuffer：字符缓冲区
+- ShortBuffer：短整型缓冲区
+- IntBuffer：整型缓冲区
+- LongBuffer：长整形缓冲区
+- FloatBuffer：浮点型缓冲区
+- DoubleBuffer：双精度浮点型缓冲区
+### 通道Channel
+Channel可以分为两大类：用于网络读写的SelectableChannel和用于文件操作的FileChannel
+### 多路复用器Selector
+它是Java NIO编程的基础，熟练的掌握Selector对于NIO编程至关重要。多路复用器提供选择已经就绪的任务的能力。简单来说，Selector会不断地
+轮询注册在其上的Channel，如果某个Channel上面发生读或写事件，这个Channel就处于就绪状态，会被Selector轮询出来，然后通过SelectionKey
+可以获取就绪的Channel的集合，然后进行后续的I/O操作。
+## NIO创建的TimerServer源码分析
+- 在`MultiplexerTimerServer`的构造方法中进行资源初始化。创建多路复用器Selector、ServerSocketChannel，对Channel和TCP参数进行
+配置。例如，将ServerSocketChannel设置为异步非阻塞模式，它的backlog设置为1024。系统资源初始化成功后，将ServerSocketChannel注册
+到Selector，监听SelectionKey.OP_ACCEPT操作位。如果资源初始化失败（例如端口被占用），则退出。
+- 在`MultiplexerTimerServer`的 _run()_ 方法中，while循环体中循环遍历selector，它的休眠时间为1s。无论是否有读写等事件发生，selector
+每隔1s都被唤醒一次。selector也提供了一个无参的select()方法：当有处于就绪状态的Channel时，selector将返回该Channel的SelectionKey
+集合。通过对就绪状态的Channel集合进行迭代，可以进行网络的异步读写操作。
+- 在`MultiplexerTimerServer`的 *handlerInput()* 方法中，处理新接入的客户端请求消息，根据SelectionKey的操作位进行判断即可获知
+网络事件的类型，通过ServerSocketChannel的accept()接收客户端的连接请求并创建SocketChannel实例。完成上述操作后，相当于完成了TCP的
+三次握手，TCP物理链路正式建立。注意：我们需要将新创建的SocketChannel设置为异步非阻塞，同时也可以对其TCP参数进行设置。例如，TCP接收和
+发送缓冲区的大小等。
 

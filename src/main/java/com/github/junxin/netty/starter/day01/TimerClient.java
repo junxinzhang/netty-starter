@@ -34,6 +34,11 @@ public class TimerClient {
             out = new PrintWriter(socket.getOutputStream(), true);
             out.println("QUERY TIME ORDER");
             System.out.println("Send order 2 server successed.");
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             String resp = in.readLine();
             System.err.println("Now is: " + resp);
 
