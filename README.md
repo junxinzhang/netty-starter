@@ -115,3 +115,5 @@ ComletionHandler接口的实现类为操作完成的回调。
 <Void, ? suuper A> handler_**：异步操作回调通知接口，由调用者实现。在例子中，这两个参数都使用 AsyncTimerClientHandler 类本身
 因为它实现了CompletionHandler接口。
 
+#多路复用器的核心是通过Selector来轮询注册在其上的Channel
+
